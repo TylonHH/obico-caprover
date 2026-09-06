@@ -1,0 +1,38 @@
+version: '2.4'
+
+services:
+  backend:
+    build:
+      context: ./source/backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./source/dotenv.example
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    volumes:
+      - ./source/frontend:/frontend
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./source/backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./source/dotenv.example
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    command: sh -c "celery -A config worker --beat -l info -c 2 -Q realtime,celery"
+    restart: unless-stopped
+
+  ml_api:
+    build:
+      context: ./source/ml_api
+      dockerfile: Dockerfile
+    env_file:
+      - ./source/dotenv.example
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+    restart: unless-stopped

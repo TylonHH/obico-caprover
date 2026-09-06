@@ -1,0 +1,31 @@
+# Ignore Docker images and containers
+*.tar
+*.tar.gz
+*.zip
+
+# Ignore environment files
+.env
+*.env
+
+# Ignore logs
+*.log
+
+# Ignore temporary files
+*.tmp
+*.temp
+
+# Ignore CapRover local files
+captain-definition.json
+
+# Ignore source build artifacts (if any)
+source/backend/__pycache__
+source/frontend/node_modules
+source/ml_api/node_modules
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*~
+source/.git/
+/source/
