@@ -1,0 +1,85 @@
+name: Check for Obico Updates
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: update-obico-submodule
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Update Obico submodule to latest release
+        id: update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync --recursive
+          git submodule update --init --remote source
+
+          if git diff --quiet -- source; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Obico is already up to date."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Current pinned commit: $(git ls-tree HEAD source | awk '{print $3}')"
+            echo "New upstream commit:  $(git -C source rev-parse HEAD)"
+          fi
+
+      - name: Commit update branch
+        if: steps.update.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B chore/update-obico
+          git add source
+          git commit -m "Update Obico submodule"
+          git push --force-with-lease origin HEAD:chore/update-obico
+
+      - name: Create or update pull request
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh pr view chore/update-obico --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Existing update pull request refreshed."
+          else
+            gh pr create \
+              --repo "$GITHUB_REPOSITORY" \
+              --base master \
+              --head chore/update-obico \
+              --title "Update Obico to latest release" \
+              --body "Automated update of the pinned Obico submodule to the latest commit on the upstream \`release\` branch. The Docker build workflow is dispatched against this branch for validation before merge."
+          fi
+
+      - name: Validate updated Obico build
+        if: steps.update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run obico-ci.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref chore/update-obico
