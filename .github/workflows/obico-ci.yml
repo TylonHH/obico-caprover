@@ -41,7 +41,8 @@ jobs:
       - name: Build backend image
         uses: docker/build-push-action@v6
         with:
-          context: ./source/backend
+          context: .
+          file: ./docker/backend.Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
           tags: |
             ghcr.io/tylonhh/obico-backend:${{ github.sha }}
