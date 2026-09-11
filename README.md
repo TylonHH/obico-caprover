@@ -54,6 +54,8 @@ redis:7.2-alpine
 
 Because the GHCR images are public, no GHCR credentials are required in CapRover.
 
+The One-Click template references these images directly. CapRover does not build derivative backend, worker, ML API, or Redis images during installation. This avoids long in-dashboard image builds and reduces the chance of proxy/API timeouts during One-Click deployment.
+
 ## Deployment
 
 ### 1. Open the CapRover One-Click template screen
@@ -113,10 +115,9 @@ obico-backend
 
 Then:
 
-1. Enable the app as a web app if required.
-2. Attach your desired domain.
-3. Enable HTTPS.
-4. Verify that the container HTTP port is `3334`.
+1. Attach your desired domain.
+2. Enable HTTPS.
+3. Verify that the container HTTP port is `3334`.
 
 Only the backend should normally be exposed publicly.
 
@@ -161,9 +162,7 @@ No manual service-name editing should be necessary.
 
 ## Service startup commands
 
-CapRover's Docker Compose parser does not reliably support every standard Compose field, including arbitrary `command` handling in imported templates.
-
-For that reason the One-Click template uses `caproverExtra.dockerfileLines` to create small derivative images with the required startup commands.
+Current CapRover versions support the `command` field in the One-Click / Compose parser, so the template uses the published images directly and supplies each service's runtime command without rebuilding an image in CapRover.
 
 ### Backend
 
@@ -185,7 +184,15 @@ celery -A config worker --beat -l info -c 2 -Q realtime,celery
 gunicorn --bind 0.0.0.0:3333 --workers 1 wsgi
 ```
 
-These match the corresponding services in the upstream Obico Docker Compose configuration.
+### Redis
+
+Redis is started with AOF persistence and password authentication enabled:
+
+```text
+redis-server --appendonly yes --requirepass <generated-password>
+```
+
+These commands match the corresponding upstream Obico services while avoiding unnecessary CapRover-side Docker builds.
 
 ## GitHub Actions
 
@@ -300,6 +307,14 @@ Additional Obico variables can be added later if needed, such as integrations, n
 
 ## Troubleshooting
 
+### One-Click deployment returns HTTP 504
+
+A 504 from the CapRover dashboard means the dashboard/API request timed out. Check the CapRover Apps list before retrying because some services may still have been created successfully.
+
+The current template avoids CapRover-side `dockerfileLines` builds and pulls prebuilt images directly, which makes this substantially less likely than previous versions of the template.
+
+If a 504 still occurs, check server resources, CapRover logs, Docker pull progress and whether the host can pull `ghcr.io/tylonhh/obico-ml-api:latest` directly.
+
 ### Backend does not start
 
 Check the backend logs first. Typical causes include:
@@ -307,7 +322,7 @@ Check the backend logs first. Typical causes include:
 - PostgreSQL not ready yet
 - invalid environment variables
 - database migration failure
-- image pull/build failure
+- image pull failure
 
 ### Worker cannot connect
 
