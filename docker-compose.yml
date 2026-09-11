@@ -15,21 +15,30 @@ services:
       notExposeAsWebApp: 'true'
 
   $$cap_appname-redis:
+    image: redis:7.2-alpine
     restart: always
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --requirepass
+      - $$cap_redis_password
     volumes:
       - $$cap_appname-redis-data:/data
     caproverExtra:
       notExposeAsWebApp: 'true'
-      dockerfileLines:
-        - FROM redis:7.2-alpine
-        - CMD ["redis-server", "--appendonly", "yes", "--requirepass", "$$cap_redis_password"]
 
   $$cap_appname-backend:
+    image: ghcr.io/tylonhh/obico-backend:latest
     restart: always
     depends_on:
       - $$cap_appname-postgres
       - $$cap_appname-redis
       - $$cap_appname-ml-api
+    command:
+      - sh
+      - -c
+      - python manage.py migrate && python manage.py collectstatic -v 2 --noinput && daphne -b 0.0.0.0 -p 3334 config.routing:application
     environment:
       DATABASE_URL: postgres://obico:$$cap_postgres_password@srv-captain--$$cap_appname-postgres:5432/obico
       REDIS_URL: redis://:$$cap_redis_password@srv-captain--$$cap_appname-redis:6379
@@ -51,15 +60,17 @@ services:
       EMAIL_USE_TLS: $$cap_email_use_tls
     caproverExtra:
       containerHttpPort: '3334'
-      dockerfileLines:
-        - FROM ghcr.io/tylonhh/obico-backend:latest
-        - CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic -v 2 --noinput && daphne -b 0.0.0.0 -p 3334 config.routing:application"]
 
   $$cap_appname-worker:
+    image: ghcr.io/tylonhh/obico-backend:latest
     restart: always
     depends_on:
       - $$cap_appname-postgres
       - $$cap_appname-redis
+    command:
+      - sh
+      - -c
+      - celery -A config worker --beat -l info -c 2 -Q realtime,celery
     environment:
       DATABASE_URL: postgres://obico:$$cap_postgres_password@srv-captain--$$cap_appname-postgres:5432/obico
       REDIS_URL: redis://:$$cap_redis_password@srv-captain--$$cap_appname-redis:6379
@@ -75,21 +86,20 @@ services:
       WEBPACK_LOADER_ENABLED: 'False'
     caproverExtra:
       notExposeAsWebApp: 'true'
-      dockerfileLines:
-        - FROM ghcr.io/tylonhh/obico-backend:latest
-        - CMD ["sh", "-c", "celery -A config worker --beat -l info -c 2 -Q realtime,celery"]
 
   $$cap_appname-ml-api:
+    image: ghcr.io/tylonhh/obico-ml-api:latest
     restart: always
+    command:
+      - bash
+      - -c
+      - gunicorn --bind 0.0.0.0:3333 --workers 1 wsgi
     environment:
       DEBUG: 'True'
       FLASK_APP: server.py
       ML_API_TOKEN: $$cap_ml_api_token
     caproverExtra:
       notExposeAsWebApp: 'true'
-      dockerfileLines:
-        - FROM ghcr.io/tylonhh/obico-ml-api:latest
-        - CMD ["bash", "-c", "gunicorn --bind 0.0.0.0:3333 --workers 1 wsgi"]
 
 caproverOneClickApp:
   variables:
