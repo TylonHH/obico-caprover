@@ -56,7 +56,7 @@ services:
       SITE_IS_PUBLIC: 'True'
       ACCOUNT_ALLOW_SIGN_UP: 'True'
       WEBPACK_LOADER_ENABLED: 'False'
-      CSRF_TRUSTED_ORIGINS: https://$$cap_appname-backend.$$cap_root_domain
+      CSRF_TRUSTED_ORIGINS: '["https://$$cap_appname-backend.$$cap_root_domain"]'
       DEFAULT_FROM_EMAIL: $$cap_default_from_email
       EMAIL_HOST: $$cap_email_host
       EMAIL_HOST_USER: $$cap_email_host_user
