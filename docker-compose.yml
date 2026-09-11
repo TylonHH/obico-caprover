@@ -38,7 +38,11 @@ services:
     command:
       - sh
       - -c
-      - python manage.py migrate && python manage.py collectstatic -v 2 --noinput && daphne -b 0.0.0.0 -p 3334 config.routing:application
+      - >-
+        python manage.py migrate &&
+        python manage.py shell -c "from django.contrib.sites.models import Site; Site.objects.update_or_create(id=1, defaults={'domain': '$$cap_public_host', 'name': '$$cap_public_host'})" &&
+        python manage.py collectstatic -v 2 --noinput &&
+        daphne -b 0.0.0.0 -p 3334 config.routing:application
     environment:
       DATABASE_URL: postgres://obico:$$cap_postgres_password@srv-captain--$$cap_appname-postgres:5432/obico
       REDIS_URL: redis://:$$cap_redis_password@srv-captain--$$cap_appname-redis:6379
@@ -52,6 +56,7 @@ services:
       SITE_IS_PUBLIC: 'True'
       ACCOUNT_ALLOW_SIGN_UP: 'True'
       WEBPACK_LOADER_ENABLED: 'False'
+      CSRF_TRUSTED_ORIGINS: https://$$cap_public_host
       DEFAULT_FROM_EMAIL: $$cap_default_from_email
       EMAIL_HOST: $$cap_email_host
       EMAIL_HOST_USER: $$cap_email_host_user
@@ -103,6 +108,11 @@ services:
 
 caproverOneClickApp:
   variables:
+    - id: $$cap_public_host
+      label: Public Obico hostname
+      description: Public hostname only, without http://, https://, path, or trailing slash. Example: obico.example.com
+      validRegex: /^[A-Za-z0-9.-]+$/
+
     - id: $$cap_postgres_password
       label: PostgreSQL password
       defaultValue: $$cap_gen_random_hex(24)
@@ -165,6 +175,9 @@ caproverOneClickApp:
     start: |-
       Deploy a complete Obico server stack on CapRover.
 
+      Enter the public hostname that will be used for the Obico backend, for example obico.example.com.
+      Do not include https:// or a trailing slash.
+
       This template creates five services automatically:
       - PostgreSQL
       - Redis
@@ -178,7 +191,9 @@ caproverOneClickApp:
       Obico has been deployed.
 
       The public web service is $$cap_appname-backend and listens internally on port 3334.
-      Enable HTTPS and attach your desired domain to that app in CapRover.
+      Configure $$cap_public_host as the domain for that app and enable HTTPS in CapRover.
+
+      The Django Site record and CSRF trusted origin are configured automatically from the supplied hostname.
 
       PostgreSQL, Redis, worker and ML API are internal-only services.
       PostgreSQL and Redis data are stored in persistent volumes.
