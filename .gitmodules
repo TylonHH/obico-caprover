@@ -1,3 +1,4 @@
 [submodule "source"]
 	path = source
 	url = https://github.com/TheSpaghettiDetective/obico-server
+	branch = release
