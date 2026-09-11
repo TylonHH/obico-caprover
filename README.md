@@ -123,6 +123,38 @@ Only the backend should normally be exposed publicly.
 
 PostgreSQL, Redis, worker and ML API are configured as internal-only services.
 
+## Post-install security
+
+The template intentionally starts with account registration enabled so the operator can create the first Obico account.
+
+After the first account has been created, private/self-hosted installations should usually disable public registration.
+
+In CapRover, update the environment variables for both the backend and worker apps:
+
+```text
+ACCOUNT_ALLOW_SIGN_UP=False
+```
+
+Existing accounts are not removed; this only prevents new users from registering themselves.
+
+For a private Obico instance, consider also setting:
+
+```text
+SITE_IS_PUBLIC=False
+```
+
+Recommended private-instance settings after initial registration:
+
+```text
+ACCOUNT_ALLOW_SIGN_UP=False
+SITE_IS_PUBLIC=False
+SITE_USES_HTTPS=True
+```
+
+Apply the same application-level environment values to both the backend and worker so both services stay consistent.
+
+If you intentionally operate a public/multi-user Obico instance, leave `ACCOUNT_ALLOW_SIGN_UP=True` only when self-registration is desired.
+
 ## Persistence
 
 The template creates persistent CapRover volumes for PostgreSQL and Redis:
