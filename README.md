@@ -189,19 +189,30 @@ These match the corresponding services in the upstream Obico Docker Compose conf
 
 ## GitHub Actions
 
-The workflow is located at:
+### Image build workflow
+
+The image workflow is located at:
 
 ```text
 .github/workflows/obico-ci.yml
 ```
 
-It runs on pushes to the repository's default branch:
+It runs on:
+
+- pushes to `master`
+- pull requests targeting `master`
+- manual `workflow_dispatch`
+
+The workflow builds:
 
 ```text
-master
+ghcr.io/tylonhh/obico-backend
+ghcr.io/tylonhh/obico-ml-api
 ```
 
-and builds/publishes:
+Only a direct push to `master` publishes images to GHCR. Pull requests and manual validation runs build the images without publishing them.
+
+Published tags are:
 
 ```text
 ghcr.io/tylonhh/obico-backend:<commit-sha>
@@ -211,9 +222,36 @@ ghcr.io/tylonhh/obico-ml-api:<commit-sha>
 ghcr.io/tylonhh/obico-ml-api:latest
 ```
 
-Pull requests build the images for validation but do not push them.
+GitHub Actions cache is enabled separately for the backend and ML API Buildx builds. This significantly reduces rebuild time when Docker layers have not changed.
 
-## Updating Obico
+Concurrency control also cancels obsolete builds for the same workflow/ref when a newer build starts.
+
+### Automatic upstream update workflow
+
+The upstream update workflow is located at:
+
+```text
+.github/workflows/update-obico.yml
+```
+
+The `source/` Git submodule explicitly tracks Obico's upstream `release` branch.
+
+Once per day, GitHub Actions checks whether the pinned Obico commit is behind the latest upstream `release` commit.
+
+If no update exists, nothing is changed.
+
+If an update exists, the workflow:
+
+1. updates the `source` submodule on branch `chore/update-obico`
+2. creates or refreshes a pull request targeting `master`
+3. manually dispatches the Docker build workflow against that update branch
+4. validates both images without publishing them
+
+After the update pull request is reviewed and merged, the normal `master` push triggers the production build and publishes the new `latest` and commit-SHA images.
+
+This keeps upstream updates automated while avoiding silent production upgrades.
+
+## Updating Obico manually
 
 The Obico source is included as a Git submodule under:
 
@@ -221,12 +259,21 @@ The Obico source is included as a Git submodule under:
 source/
 ```
 
-To update Obico:
+It is configured in `.gitmodules` to track:
 
-1. Update the `source` submodule to the desired upstream Obico revision.
-2. Commit and push the changed submodule reference to `master`.
-3. Wait for the GitHub Actions build to finish successfully.
-4. Redeploy or force-update the backend, worker and ML API apps in CapRover so they pull the newest `latest` images.
+```text
+branch = release
+```
+
+Normally the scheduled update workflow handles upstream detection automatically.
+
+To update manually:
+
+1. Update `source` to the desired upstream Obico revision.
+2. Commit the changed submodule reference.
+3. Open/merge the change into `master`.
+4. Wait for the GitHub Actions build to finish successfully.
+5. Redeploy or force-update the backend, worker and ML API apps in CapRover so they pull the newest `latest` images.
 
 For reproducible production deployments, consider replacing `latest` in the template with a fixed image tag or commit SHA.
 
@@ -295,11 +342,12 @@ Redis authentication is enabled by this template.
 ## Repository layout
 
 ```text
-.github/workflows/obico-ci.yml   GitHub Actions image build
-.gitmodules                      Obico upstream submodule configuration
-docker-compose.yml               CapRover One-Click v4 template
-source/                          Obico upstream source submodule
-README.md                        Deployment documentation
+.github/workflows/obico-ci.yml       Docker image build and publish workflow
+.github/workflows/update-obico.yml   Scheduled upstream Obico update workflow
+.gitmodules                          Obico upstream release-branch tracking
+docker-compose.yml                   CapRover One-Click v4 template
+source/                              Obico upstream source submodule
+README.md                            Deployment documentation
 ```
 
 ## Upstream projects
