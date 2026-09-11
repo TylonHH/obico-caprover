@@ -1,4 +1,4 @@
-# Obico Server for CapRover
+# Obico Server for CapRover 
 
 This repository contains the configuration to deploy the [Obico server](https://github.com/TheSpaghettiDetective/obico-server) on [CapRover](https://caprover.com/) using Docker Compose and GitHub Actions for automated image builds.
 
